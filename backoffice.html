@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quickland CRM - Panel Back Office</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
+
+  <!-- Navbar -->
+  <nav class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center shadow-lg">
+    <div class="flex items-center space-x-3">
+      <div class="bg-blue-600 p-2 rounded-xl">
+        <i class="fa-solid fa-headset text-lg"></i>
+      </div>
+      <div>
+        <h1 class="font-black text-lg tracking-wide">Quickland CRM</h1>
+        <p class="text-[11px] text-slate-400">Consola de Validación y Gestión Back Office</p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-4">
+      <button onclick="cargarVentas()" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-2 rounded-lg border border-slate-700 flex items-center transition">
+        <i class="fa-solid fa-rotate-right mr-1.5"></i> Refrescar Datos
+      </button>
+      <a href="/" class="text-xs bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-lg font-semibold transition">
+        ← Vista de Campo (Móvil)
+      </a>
+    </div>
+  </nav>
+
+  <!-- Contenedor Principal -->
+  <main class="max-w-7xl mx-auto p-6 space-y-6">
+
+    <!-- Tarjetas de Resumen KPI -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-400">Total Ventas</p>
+          <h3 id="kpiTotal" class="text-2xl font-black text-slate-800 mt-1">-</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-lg font-bold">
+          <i class="fa-solid fa-folder"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-400">Pendiente Contacto BO</p>
+          <h3 id="kpiPendientes" class="text-2xl font-black text-amber-600 mt-1">-</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-lg font-bold">
+          <i class="fa-solid fa-phone-slash"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-400">Pendiente Subir a Sistema</p>
+          <h3 id="kpiPorSubir" class="text-2xl font-black text-indigo-600 mt-1">-</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg font-bold">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+        </div>
+      </div>
+
+      <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+          <p class="text-xs font-semibold text-slate-400">Servicios Instalados</p>
+          <h3 id="kpiInstalados" class="text-2xl font-black text-emerald-600 mt-1">-</h3>
+        </div>
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg font-bold">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla y Filtros -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="relative flex-1 max-w-md">
+          <input type="text" id="filtroTexto" oninput="aplicarFiltros()" placeholder="Filtrar por cliente, DNI, teléfono o asesor..." class="w-full pl-9 pr-3 py-2 border rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+        </div>
+        <div class="flex items-center space-x-2">
+          <select id="filtroEstado" onchange="aplicarFiltros()" class="border rounded-xl text-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+            <option value="TODOS">Todos los estados</option>
+            <option value="PENDIENTE BO">Pendiente BO</option>
+            <option value="VALIDADO BO">Validado BO</option>
+            <option value="SUBIDO / EN RUTA">Subido / En Ruta</option>
+            <option value="INSTALADO">Instalado</option>
+            <option value="RECHAZADO BO">Rechazado BO</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-100">
+            <tr>
+              <th class="py-3 px-4">ID Venta</th>
+              <th class="py-3 px-4">Cliente / Contacto</th>
+              <th class="py-3 px-4">Asesor</th>
+              <th class="py-3 px-4">Plan</th>
+              <th class="py-3 px-4">Estado BO</th>
+              <th class="py-3 px-4">Subida</th>
+              <th class="py-3 px-4">Instalación</th>
+              <th class="py-3 px-4 text-center">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tablaCuerpo" class="divide-y divide-slate-100">
+            <!-- Filas dinámicas -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL PARA GESTIONAR VENTA -->
+  <div id="modalGestion" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-base text-slate-800" id="modalTitulo">Gestionar Venta</h3>
+        <button onclick="cerrarModal()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div class="bg-slate-50 p-3 rounded-xl space-y-1">
+          <p><strong class="text-slate-600">Cliente:</strong> <span id="mCliente"></span></p>
+          <p><strong class="text-slate-600">DNI:</strong> <span id="mDni"></span> | <strong class="text-slate-600">Teléfono:</strong> <span id="mTel"></span></p>
+          <p><strong class="text-slate-600">Dirección:</strong> <span id="mDir"></span></p>
+          <p><strong class="text-slate-600">Plan:</strong> <span id="mPlan"></span></p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">Estado Back Office</label>
+            <select id="mEstadoBO" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <option value="Pendiente">Pendiente</option>
+              <option value="Contactado">Contactado / Aprobado</option>
+              <option value="No contesta">No contesta</option>
+              <option value="Rechazado">Rechazado</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">Carga a Sistema</label>
+            <select id="mEstadoSubida" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <option value="Pendiente">Pendiente</option>
+              <option value="Subido">Subido</option>
+              <option value="Error">Error en carga</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">Estado Instalación</label>
+            <select id="mEstadoInstalacion" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+              <option value="Pendiente">Pendiente</option>
+              <option value="En ruta">En ruta / Agendado</option>
+              <option value="Instalado">Instalado</option>
+              <option value="Frustrado">Frustrado</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">Fecha Instalación</label>
+            <input type="date" id="mFechaInstalacion" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-600 mb-1">Observaciones / Motivo</label>
+          <textarea id="mObservaciones" rows="2" class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Añadir notas..."></textarea>
+        </div>
+      </div>
+
+      <div class="flex justify-end space-x-2 pt-2 border-t">
+        <button onclick="cerrarModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-semibold text-xs">Cancelar</button>
+        <button onclick="guardarCambiosModal()" id="btnGuardarModal" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md transition">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let ventasGlobal = [];
+    let ventaSeleccionada = null;
+
+    async function cargarVentas() {
+      const tbody = document.getElementById('tablaCuerpo');
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-xl mr-2"></i>Cargando datos desde Sheets...</td></tr>';
+
+      try {
+        const res = await fetch('/api/ventas');
+        const resJson = await res.json();
+        if (resJson.status === 'success') {
+          ventasGlobal = resJson.data.reverse();
+          actualizarKPIs();
+          aplicarFiltros();
+        }
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-red-500">Error al consultar Google Sheets</td></tr>';
+      }
+    }
+
+    function actualizarKPIs() {
+      document.getElementById('kpiTotal').innerText = ventasGlobal.length;
+      document.getElementById('kpiPendientes').innerText = ventasGlobal.filter(v => v.ESTADO_BO === 'Pendiente').length;
+      document.getElementById('kpiPorSubir').innerText = ventasGlobal.filter(v => v.ESTADO_SUBIDA === 'Pendiente' && v.ESTADO_BO === 'Contactado').length;
+      document.getElementById('kpiInstalados').innerText = ventasGlobal.filter(v => v.ESTADO_INSTALACION === 'Instalado').length;
+    }
+
+    function aplicarFiltros() {
+      const q = document.getElementById('filtroTexto').value.toLowerCase();
+      const estado = document.getElementById('filtroEstado').value;
+
+      const filtradas = ventasGlobal.filter(v => {
+        const coincideTexto = (v.CLIENTE_NOMBRE || '').toLowerCase().includes(q) ||
+                              (String(v.CLIENTE_DNI) || '').includes(q) ||
+                              (v.ASESOR_CAMPO || '').toLowerCase().includes(q) ||
+                              (String(v.CLIENTE_TELEFONO) || '').includes(q);
+        const coincideEstado = estado === 'TODOS' || v.ESTADO_GENERAL === estado;
+        return coincideTexto && coincideEstado;
+      });
+
+      renderizarTabla(filtradas);
+    }
+
+    function renderizarTabla(ventas) {
+      const tbody = document.getElementById('tablaCuerpo');
+      if (ventas.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400">No se encontraron ventas con los filtros aplicados.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = ventas.map(v => {
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-3 px-4 font-mono font-bold text-slate-500">${v.ID_VENTA}</td>
+            <td class="py-3 px-4">
+              <div class="font-bold text-slate-800">${v.CLIENTE_NOMBRE}</div>
+              <div class="text-[11px] text-slate-400">DNI: ${v.CLIENTE_DNI} | Tel: ${v.CLIENTE_TELEFONO}</div>
+            </td>
+            <td class="py-3 px-4 font-medium text-slate-600">${v.ASESOR_CAMPO}</td>
+            <td class="py-3 px-4 text-slate-600">${v.PLAN_PRODUCTO}</td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-1 rounded-full text-[10px] font-bold ${v.ESTADO_BO === 'Contactado' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}">
+                ${v.ESTADO_BO || 'Pendiente'}
+              </span>
+            </td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-1 rounded-full text-[10px] font-bold ${v.ESTADO_SUBIDA === 'Subido' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}">
+                ${v.ESTADO_SUBIDA || 'Pendiente'}
+              </span>
+            </td>
+            <td class="py-3 px-4">
+              <span class="px-2 py-1 rounded-full text-[10px] font-bold ${v.ESTADO_INSTALACION === 'Instalado' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}">
+                ${v.ESTADO_INSTALACION || 'Pendiente'}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-center">
+              <button onclick='abrirModal(${JSON.stringify(v)})' class="bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-3 py-1.5 rounded-lg font-bold text-[11px] transition">
+                Gestionar
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function abrirModal(venta) {
+      ventaSeleccionada = venta;
+      document.getElementById('modalTitulo').innerText = `Gestionar Venta: ${venta.ID_VENTA}`;
+      document.getElementById('mCliente').innerText = venta.CLIENTE_NOMBRE;
+      document.getElementById('mDni').innerText = venta.CLIENTE_DNI;
+      document.getElementById('mTel').innerText = venta.CLIENTE_TELEFONO;
+      document.getElementById('mDir').innerText = venta.DIRECCION;
+      document.getElementById('mPlan').innerText = venta.PLAN_PRODUCTO;
+
+      document.getElementById('mEstadoBO').value = venta.ESTADO_BO || 'Pendiente';
+      document.getElementById('mEstadoSubida').value = venta.ESTADO_SUBIDA || 'Pendiente';
+      document.getElementById('mEstadoInstalacion').value = venta.ESTADO_INSTALACION || 'Pendiente';
+      document.getElementById('mFechaInstalacion').value = venta.FECHA_INSTALACION || '';
+      document.getElementById('mObservaciones').value = venta.OBSERVACIONES || '';
+
+      document.getElementById('modalGestion').classList.remove('hidden');
+    }
+
+    function cerrarModal() {
+      document.getElementById('modalGestion').classList.add('hidden');
+      ventaSeleccionada = null;
+    }
+
+    async function guardarCambiosModal() {
+      if (!ventaSeleccionada) return;
+
+      const btn = document.getElementById('btnGuardarModal');
+      btn.disabled = true;
+      btn.innerText = 'Guardando...';
+
+      const payload = {
+        estado_bo: document.getElementById('mEstadoBO').value,
+        estado_subida: document.getElementById('mEstadoSubida').value,
+        estado_instalacion: document.getElementById('mEstadoInstalacion').value,
+        fecha_instalacion: document.getElementById('mFechaInstalacion').value,
+        observaciones: document.getElementById('mObservaciones').value
+      };
+
+      try {
+        const res = await fetch(`/api/ventas/${ventaSeleccionada.ID_VENTA}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          cerrarModal();
+          cargarVentas();
+        } else {
+          alert('Error: ' + data.message);
+        }
+      } catch (e) {
+        alert('Error de conexión al actualizar');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Guardar Cambios';
+      }
+    }
+
+    // Carga inicial automática
+    cargarVentas();
+  </script>
+</body>
+</html>
