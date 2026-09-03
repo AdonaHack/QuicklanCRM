@@ -20,12 +20,18 @@
         <p class="text-[11px] text-slate-400">Consola de Validación y Gestión Back Office</p>
       </div>
     </div>
-    <div class="flex items-center space-x-4">
+    <div class="flex items-center space-x-3">
+      <span class="text-xs text-slate-400 hidden sm:inline">Usuario: <strong class="text-white">{{ nombre or usuario }}</strong></span>
       <button onclick="cargarVentas()" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-2 rounded-lg border border-slate-700 flex items-center transition">
         <i class="fa-solid fa-rotate-right mr-1.5"></i> Refrescar Datos
       </button>
-      <a href="/" class="text-xs bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-lg font-semibold transition">
-        ← Vista de Campo (Móvil)
+      {% if rol == 'ADMIN' %}
+      <a href="/admin" class="text-xs bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded-lg font-semibold transition">
+        Panel Admin
+      </a>
+      {% endif %}
+      <a href="/logout" class="text-xs bg-rose-600 hover:bg-rose-700 px-3.5 py-2 rounded-lg font-bold flex items-center transition shadow-sm">
+        <i class="fa-solid fa-right-from-bracket mr-1.5"></i> Cerrar Sesión
       </a>
     </div>
   </nav>
@@ -328,7 +334,6 @@
       }
     }
 
-    // Carga inicial automática
     cargarVentas();
   </script>
 </body>
