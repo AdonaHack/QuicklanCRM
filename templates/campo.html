@@ -13,36 +13,51 @@
   <header class="bg-blue-600 text-white sticky top-0 z-50 shadow-md px-4 py-3 flex justify-between items-center">
     <div class="flex items-center space-x-2">
       <i class="fa-solid fa-satellite-dish text-xl"></i>
-      <h1 class="font-bold text-lg tracking-wide">Quickland CRM</h1>
+      <div>
+        <h1 class="font-bold text-base leading-tight">Quickland CRM</h1>
+        <p class="text-[10px] text-blue-200">Asesor: <strong class="text-white">{{ nombre or usuario }}</strong></p>
+      </div>
     </div>
-    <a href="/backoffice" class="text-xs bg-blue-700 px-3 py-1.5 rounded-full hover:bg-blue-800 transition">
-      Modo Back Office →
-    </a>
+    <div class="flex items-center space-x-2">
+      {% if rol == 'ADMIN' %}
+      <a href="/admin" class="text-[11px] bg-blue-700 px-2.5 py-1 rounded-lg">Admin</a>
+      {% endif %}
+      <a href="/logout" class="text-xs bg-rose-600 hover:bg-rose-700 p-1.5 rounded-lg transition" title="Cerrar sesión">
+        <i class="fa-solid fa-right-from-bracket"></i>
+      </a>
+    </div>
   </header>
 
-  <!-- Pestañas de Navegación Móvil -->
-  <div class="max-w-md mx-auto p-4">
-    <div class="flex bg-slate-200 p-1 rounded-xl mb-4 text-sm font-medium">
+  <div class="max-w-md mx-auto p-4 space-y-4">
+
+    <!-- Tarjetas de Resumen de Comisiones del Asesor -->
+    <div class="grid grid-cols-2 gap-2 text-xs">
+      <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+        <p class="text-[10px] text-slate-400 font-bold uppercase">Ventas Exitosas</p>
+        <h4 id="kpiInstaladas" class="text-xl font-black text-emerald-600 mt-0.5">0</h4>
+        <span class="text-[10px] text-slate-400">Instaladas al 100%</span>
+      </div>
+
+      <div class="bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+        <p class="text-[10px] text-slate-400 font-bold uppercase">Comisión por Cobrar</p>
+        <h4 id="kpiComision" class="text-xl font-black text-blue-600 mt-0.5">S/ 0.00</h4>
+        <span id="kpiFechaPago" class="text-[10px] text-slate-400">Pendiente de fecha</span>
+      </div>
+    </div>
+
+    <!-- Pestañas de Navegación Móvil -->
+    <div class="flex bg-slate-200 p-1 rounded-xl text-sm font-medium">
       <button id="tabRegistrar" onclick="cambiarPestana('registrar')" class="flex-1 py-2 rounded-lg bg-white shadow text-blue-600 font-semibold transition">
         <i class="fa-solid fa-plus-circle mr-1"></i> Nueva Venta
       </button>
       <button id="tabVentas" onclick="cambiarPestana('ventas')" class="flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition">
-        <i class="fa-solid fa-list-check mr-1"></i> Mis Ventas
+        <i class="fa-solid fa-list-check mr-1"></i> Mis Ventas (<span id="badgeTotal">0</span>)
       </button>
     </div>
 
     <!-- SECCIÓN 1: FORMULARIO DE NUEVA VENTA -->
     <div id="seccionRegistrar" class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-      <h2 class="text-base font-bold text-slate-800 mb-3 flex items-center">
-        <i class="fa-solid fa-user-tag text-blue-600 mr-2"></i> Ingreso de Venta en Terreno
-      </h2>
-
       <form id="formVenta" onsubmit="enviarVenta(event)" class="space-y-3 text-sm">
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre del Asesor (Tú)</label>
-          <input type="text" id="asesor_campo" required placeholder="Ej. CARLOS PÉREZ" class="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none">
-        </div>
-
         <div>
           <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre Completo del Cliente</label>
           <input type="text" id="cliente_nombre" required placeholder="Ej. Juan Gómez Salazar" class="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none">
@@ -64,26 +79,31 @@
           <input type="text" id="direccion" required placeholder="Av. Principal 123, Dpto 4, Distrito" class="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none">
         </div>
 
-        <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">Plan / Producto</label>
-          <select id="plan_producto" required class="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
-            <option value="">Selecciona el plan...</option>
-            <option value="Fibra Óptica 100 Mbps">Fibra Óptica 100 Mbps</option>
-            <option value="Fibra Óptica 200 Mbps">Fibra Óptica 200 Mbps</option>
-            <option value="Fibra Óptica 300 Mbps">Fibra Óptica 300 Mbps</option>
-            <option value="Dúo Fibra + TV">Dúo Fibra + TV</option>
-            <option value="Otro">Otro servicio</option>
-          </select>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Plan / Producto</label>
+            <select id="plan_producto" required onchange="autocompletarPrecio()" class="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+              <option value="">Selecciona...</option>
+              <option value="Fibra 100 Mbps" data-precio="65">Fibra 100 Mbps</option>
+              <option value="Fibra 200 Mbps" data-precio="85">Fibra 200 Mbps</option>
+              <option value="Fibra 300 Mbps" data-precio="105">Fibra 300 Mbps</option>
+              <option value="Dúo Fibra + TV" data-precio="120">Dúo Fibra + TV</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Precio Plan (S/)</label>
+            <input type="number" id="precio_plan" required placeholder="65" class="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50 font-bold">
+          </div>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">Observaciones / Horario de contacto</label>
-          <textarea id="observaciones" rows="2" placeholder="Llamar después de las 3pm, portón negro..." class="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Observaciones para Back Office</label>
+          <textarea id="observaciones" rows="2" placeholder="Llamar en las tardes, portón azul..." class="w-full px-3 py-2 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
         </div>
 
         <button type="submit" id="btnGuardar" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/30 transition flex items-center justify-center space-x-2">
           <i class="fa-solid fa-paper-plane"></i>
-          <span>Subir Venta al CRM</span>
+          <span>Subir Venta</span>
         </button>
       </form>
     </div>
@@ -91,25 +111,25 @@
     <!-- SECCIÓN 2: MIS VENTAS (ESTADO EN TIEMPO REAL) -->
     <div id="seccionVentas" class="hidden space-y-3">
       <div class="relative">
-        <input type="text" id="buscadorVentas" oninput="filtrarVentas()" placeholder="Buscar por DNI, cliente o asesor..." class="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm">
+        <input type="text" id="buscadorVentas" oninput="filtrarVentas()" placeholder="Buscar por DNI o cliente..." class="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none shadow-sm">
         <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-sm"></i>
       </div>
 
-      <div class="flex justify-between items-center px-1">
-        <span id="contadorVentas" class="text-xs font-semibold text-slate-500">Cargando ventas...</span>
-        <button onclick="cargarVentas()" class="text-xs text-blue-600 font-bold hover:underline flex items-center">
-          <i class="fa-solid fa-rotate-right mr-1"></i> Actualizar
-        </button>
-      </div>
-
       <div id="listaVentas" class="space-y-3">
-        <!-- Las tarjetas se generan dinámicamente con JavaScript -->
+        <!-- Tarjetas dinámicas -->
       </div>
     </div>
   </div>
 
   <script>
-    let todasLasVentas = [];
+    let misVentas = [];
+
+    function autocompletarPrecio() {
+      const select = document.getElementById('plan_producto');
+      const opt = select.options[select.selectedIndex];
+      const precio = opt.getAttribute('data-precio') || '';
+      document.getElementById('precio_plan').value = precio;
+    }
 
     function cambiarPestana(pestana) {
       if (pestana === 'registrar') {
@@ -133,14 +153,13 @@
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> Guardando...';
 
       const payload = {
-        asesor_campo: document.getElementById('asesor_campo').value,
         cliente_nombre: document.getElementById('cliente_nombre').value,
         cliente_dni: document.getElementById('cliente_dni').value,
         cliente_telefono: document.getElementById('cliente_telefono').value,
         direccion: document.getElementById('direccion').value,
         plan_producto: document.getElementById('plan_producto').value,
-        observaciones: document.getElementById('observaciones').value,
-        evidencia_drive: ""
+        precio_plan: document.getElementById('precio_plan').value,
+        observaciones: document.getElementById('observaciones').value
       };
 
       try {
@@ -152,10 +171,7 @@
         const data = await res.json();
         if (data.status === 'success') {
           alert('¡Venta registrada con éxito! Código: ' + data.id_venta);
-          // Guardar el nombre del asesor para que no lo vuelva a escribir
-          const asesor = document.getElementById('asesor_campo').value;
           document.getElementById('formVenta').reset();
-          document.getElementById('asesor_campo').value = asesor;
           cambiarPestana('ventas');
         } else {
           alert('Error: ' + data.message);
@@ -164,72 +180,103 @@
         alert('Error de conexión con el servidor');
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Subir Venta al CRM';
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Subir Venta';
       }
     }
 
     async function cargarVentas() {
       const contenedor = document.getElementById('listaVentas');
-      contenedor.innerHTML = '<div class="text-center py-8 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i><p class="text-xs mt-2">Consultando Google Sheets...</p></div>';
+      contenedor.innerHTML = '<div class="text-center py-8 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-2xl"></i><p class="text-xs mt-2">Consultando tus ventas...</p></div>';
 
       try {
         const res = await fetch('/api/ventas');
         const resJson = await res.json();
         if (resJson.status === 'success') {
-          todasLasVentas = resJson.data.reverse(); // Más recientes primero
-          renderizarTarjetas(todasLasVentas);
+          misVentas = resJson.data.reverse();
+          actualizarResumen();
+          renderizarTarjetas(misVentas);
         }
       } catch (e) {
-        contenedor.innerHTML = '<p class="text-xs text-red-500 text-center py-4">Error al cargar ventas</p>';
+        contenedor.innerHTML = '<p class="text-xs text-red-500 text-center py-4">Error al cargar datos</p>';
       }
+    }
+
+    function actualizarResumen() {
+      document.getElementById('badgeTotal').innerText = misVentas.length;
+      const instaladas = misVentas.filter(v => v.ESTADO_INSTALACION === 'Instalado').length;
+      document.getElementById('kpiInstaladas').innerText = instaladas;
+
+      // Sumar comisiones
+      let comisionTotal = 0;
+      let proxPago = "Pendiente de fecha";
+
+      misVentas.forEach(v => {
+        if (v.ESTADO_COMISION === 'Comisionado' || v.ESTADO_COMISION === 'Por liquidar') {
+          comisionTotal += parseFloat(v.MONTO_COMISION || 0);
+        }
+        if (v.FECHA_PAGO_COMISION && v.ESTADO_COMISION === 'Comisionado') {
+          proxPago = `Cobro: ${v.FECHA_PAGO_COMISION}`;
+        }
+      });
+
+      document.getElementById('kpiComision').innerText = `S/ ${comisionTotal.toFixed(2)}`;
+      document.getElementById('kpiFechaPago').innerText = proxPago;
     }
 
     function renderizarTarjetas(ventas) {
       const contenedor = document.getElementById('listaVentas');
-      document.getElementById('contadorVentas').innerText = `${ventas.length} ventas encontradas`;
-
       if (ventas.length === 0) {
-        contenedor.innerHTML = '<div class="bg-white p-6 rounded-2xl text-center text-slate-400 text-xs">No hay ventas registradas aún.</div>';
+        contenedor.innerHTML = '<div class="bg-white p-6 rounded-2xl text-center text-slate-400 text-xs">No tienes ventas registradas aún.</div>';
         return;
       }
 
       contenedor.innerHTML = ventas.map(v => {
-        // Badges según estado
         let badgeColor = "bg-amber-100 text-amber-700 border-amber-200";
         if (v.ESTADO_GENERAL === "INSTALADO") badgeColor = "bg-emerald-100 text-emerald-700 border-emerald-200";
         if (v.ESTADO_GENERAL === "RECHAZADO BO" || v.ESTADO_GENERAL === "INST. FRUSTRADA") badgeColor = "bg-rose-100 text-rose-700 border-rose-200";
-        if (v.ESTADO_GENERAL === "SUBIDO / EN RUTA") badgeColor = "bg-blue-100 text-blue-700 border-blue-200";
+
+        let badgeComision = "bg-slate-100 text-slate-600";
+        if (v.ESTADO_COMISION === "Comisionado") badgeComision = "bg-emerald-100 text-emerald-700 font-bold";
+        if (v.ESTADO_COMISION === "Por liquidar") badgeComision = "bg-blue-100 text-blue-700 font-bold";
 
         return `
-          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-2">
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-2.5">
             <div class="flex justify-between items-start">
               <div>
                 <span class="text-[10px] font-mono font-bold text-slate-400">${v.ID_VENTA}</span>
                 <h3 class="text-sm font-bold text-slate-800 leading-tight">${v.CLIENTE_NOMBRE}</h3>
-                <p class="text-xs text-slate-500 font-medium">${v.PLAN_PRODUCTO}</p>
+                <p class="text-xs text-slate-500 font-medium">${v.PLAN_PRODUCTO} • S/ ${v.PRECIO_PLAN || 0}</p>
               </div>
-              <span class="text-[11px] font-bold px-2.5 py-1 rounded-full border ${badgeColor}">
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeColor}">
                 ${v.ESTADO_GENERAL || 'PENDIENTE'}
               </span>
             </div>
 
-            <!-- Indicadores de avance en tiempo real -->
-            <div class="grid grid-cols-3 gap-1 pt-2 text-[10px] text-center border-t border-slate-100">
-              <div class="p-1.5 rounded-lg ${v.ESTADO_BO === 'Contactado' ? 'bg-blue-50 text-blue-700 font-bold' : 'bg-slate-50 text-slate-400'}">
-                <i class="fa-solid fa-phone mr-1"></i> BO: ${v.ESTADO_BO || 'Pendiente'}
+            <!-- Datos de Comisión -->
+            <div class="bg-slate-50 p-2 rounded-xl flex justify-between items-center text-[11px]">
+              <div>
+                <span class="text-slate-400">Comisión estimada:</span>
+                <strong class="text-slate-700 ml-1">S/ ${v.MONTO_COMISION || 0}</strong>
               </div>
-              <div class="p-1.5 rounded-lg ${v.ESTADO_SUBIDA === 'Subido' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'bg-slate-50 text-slate-400'}">
-                <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Subida: ${v.ESTADO_SUBIDA || 'Pendiente'}
+              <span class="px-2 py-0.5 rounded-lg text-[10px] ${badgeComision}">
+                ${v.ESTADO_COMISION || 'Pendiente'}
+              </span>
+            </div>
+
+            <!-- Avance operativo -->
+            <div class="grid grid-cols-3 gap-1 text-[10px] text-center border-t border-slate-100 pt-2">
+              <div class="p-1 rounded ${v.ESTADO_BO === 'Contactado' ? 'bg-blue-50 text-blue-700 font-bold' : 'bg-slate-50 text-slate-400'}">
+                BO: ${v.ESTADO_BO || 'Pendiente'}
               </div>
-              <div class="p-1.5 rounded-lg ${v.ESTADO_INSTALACION === 'Instalado' ? 'bg-emerald-50 text-emerald-700 font-bold' : 'bg-slate-50 text-slate-400'}">
-                <i class="fa-solid fa-wrench mr-1"></i> ${v.ESTADO_INSTALACION || 'Pendiente'}
+              <div class="p-1 rounded ${v.ESTADO_SUBIDA === 'Subido' ? 'bg-indigo-50 text-indigo-700 font-bold' : 'bg-slate-50 text-slate-400'}">
+                Subida: ${v.ESTADO_SUBIDA || 'Pendiente'}
+              </div>
+              <div class="p-1 rounded ${v.ESTADO_INSTALACION === 'Instalado' ? 'bg-emerald-50 text-emerald-700 font-bold' : 'bg-slate-50 text-slate-400'}">
+                ${v.ESTADO_INSTALACION || 'Pendiente'}
               </div>
             </div>
 
-            <div class="flex justify-between items-center text-[10px] text-slate-400 pt-1">
-              <span><i class="fa-solid fa-user-tie mr-1"></i>${v.ASESOR_CAMPO}</span>
-              <span><i class="fa-solid fa-calendar-days mr-1"></i>${v.FECHA_REGISTRO}</span>
-            </div>
+            ${v.OBSERVACIONES ? `<p class="text-[11px] text-slate-500 italic bg-amber-50/50 p-2 rounded-lg border border-amber-100"><i class="fa-solid fa-comment-dots text-amber-500 mr-1"></i>${v.OBSERVACIONES}</p>` : ''}
           </div>
         `;
       }).join('');
@@ -237,13 +284,14 @@
 
     function filtrarVentas() {
       const q = document.getElementById('buscadorVentas').value.toLowerCase();
-      const filtradas = todasLasVentas.filter(v => 
+      const filtradas = misVentas.filter(v => 
         (v.CLIENTE_NOMBRE || '').toLowerCase().includes(q) ||
-        (String(v.CLIENTE_DNI) || '').includes(q) ||
-        (v.ASESOR_CAMPO || '').toLowerCase().includes(q)
+        (String(v.CLIENTE_DNI) || '').includes(q)
       );
       renderizarTarjetas(filtradas);
     }
+
+    cargarVentas();
   </script>
 </body>
 </html>

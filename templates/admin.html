@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quickland CRM - Administración Global</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
+
+  <nav class="bg-purple-950 text-white px-6 py-4 flex justify-between items-center shadow-lg">
+    <div class="flex items-center space-x-3">
+      <div class="bg-purple-600 p-2 rounded-xl">
+        <i class="fa-solid fa-shield-halved text-lg"></i>
+      </div>
+      <div>
+        <h1 class="font-black text-lg tracking-wide">Quickland CRM</h1>
+        <p class="text-[11px] text-purple-300">Panel Central de Administración y Usuarios</p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-3">
+      <a href="/campo" class="text-xs bg-purple-900 hover:bg-purple-800 px-3 py-1.5 rounded-lg">Vista Campo</a>
+      <a href="/backoffice" class="text-xs bg-purple-900 hover:bg-purple-800 px-3 py-1.5 rounded-lg">Back Office</a>
+      <a href="/postventa" class="text-xs bg-purple-900 hover:bg-purple-800 px-3 py-1.5 rounded-lg">Post-Venta</a>
+      <a href="/logout" class="bg-rose-600 hover:bg-rose-700 text-xs px-3 py-1.5 rounded-lg font-bold">Salir</a>
+    </div>
+  </nav>
+
+  <main class="max-w-6xl mx-auto p-6 space-y-6">
+    <div class="flex justify-between items-center">
+      <h2 class="font-black text-xl text-slate-800">Gestión de Accesos y Usuarios</h2>
+      <button onclick="document.getElementById('modalNuevoUser').classList.remove('hidden')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-4 py-2 rounded-xl shadow transition">
+        <i class="fa-solid fa-user-plus mr-1"></i> Crear Usuario
+      </button>
+    </div>
+
+    <!-- Tabla de Usuarios -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <table class="w-full text-left text-xs border-collapse">
+        <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b">
+          <tr>
+            <th class="py-3 px-4">ID</th>
+            <th class="py-3 px-4">Nombre Completo</th>
+            <th class="py-3 px-4">Usuario</th>
+            <th class="py-3 px-4">Rol</th>
+            <th class="py-3 px-4">Estado</th>
+            <th class="py-3 px-4 text-center">Acción</th>
+          </tr>
+        </thead>
+        <tbody id="tablaUsuarios" class="divide-y divide-slate-100">
+          <!-- Dinámico -->
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- MODAL NUEVO USUARIO -->
+  <div id="modalNuevoUser" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+      <h3 class="font-bold text-base text-slate-800 border-b pb-2">Crear Nuevo Usuario</h3>
+      <form onsubmit="crearUsuario(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-600 mb-1">Nombre Completo</label>
+          <input type="text" id="nuNombre" required placeholder="Ej. Ana Torres" class="w-full border rounded-lg p-2">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-1">Nombre de Usuario (Login)</label>
+          <input type="text" id="nuUsuario" required placeholder="Ej. atorres" class="w-full border rounded-lg p-2">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-1">Contraseña</label>
+          <input type="password" id="nuPassword" required placeholder="••••••" class="w-full border rounded-lg p-2">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-600 mb-1">Rango / Rol</label>
+          <select id="nuRol" class="w-full border rounded-lg p-2">
+            <option value="VENTAS">Ventas (Campo)</option>
+            <option value="BACKOFFICE">Back Office</option>
+            <option value="POSTVENTA">Post-Venta</option>
+            <option value="ADMIN">Administración</option>
+          </select>
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-2 border-t">
+          <button type="button" onclick="document.getElementById('modalNuevoUser').classList.add('hidden')" class="px-4 py-2 text-slate-500 font-semibold">Cancelar</button>
+          <button type="submit" id="btnCrearUser" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold">Crear</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    async function cargarUsuarios() {
+      const tbody = document.getElementById('tablaUsuarios');
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-slate-400">Cargando usuarios...</td></tr>';
+      try {
+        const res = await fetch('/api/usuarios');
+        const data = await res.json();
+        if (data.status === 'success') {
+          tbody.innerHTML = data.data.map(u => `
+            <tr class="hover:bg-slate-50">
+              <td class="py-3 px-4 font-mono font-bold text-slate-400">${u.ID_USUARIO}</td>
+              <td class="py-3 px-4 font-bold text-slate-800">${u.NOMBRE_COMPLETO}</td>
+              <td class="py-3 px-4 text-purple-700 font-mono font-semibold">${u.USUARIO}</td>
+              <td class="py-3 px-4"><span class="px-2 py-0.5 rounded font-bold text-[10px] bg-purple-100 text-purple-800">${u.ROL}</span></td>
+              <td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-[10px] ${u.ESTADO === 'Activo' ? 'bg-emerald-100 text-emerald-700 font-bold' : 'bg-rose-100 text-rose-700'}">${u.ESTADO}</span></td>
+              <td class="py-3 px-4 text-center">
+                <button onclick="cambiarPassword('${u.USUARIO}')" class="text-slate-500 hover:text-purple-600 text-xs px-2 py-1"><i class="fa-solid fa-key"></i></button>
+                <button onclick="alternarEstado('${u.USUARIO}', '${u.ESTADO}')" class="text-slate-500 hover:text-purple-600 text-xs px-2 py-1"><i class="fa-solid fa-power-off"></i></button>
+              </td>
+            </tr>
+          `).join('');
+        }
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-red-500">Error al cargar usuarios</td></tr>';
+      }
+    }
+
+    async function crearUsuario(e) {
+      e.preventDefault();
+      const payload = {
+        nombre_completo: document.getElementById('nuNombre').value,
+        usuario: document.getElementById('nuUsuario').value,
+        password: document.getElementById('nuPassword').value,
+        rol: document.getElementById('nuRol').value,
+        estado: "Activo"
+      };
+
+      const res = await fetch('/api/usuarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const d = await res.json();
+      if (d.status === 'success') {
+        document.getElementById('modalNuevoUser').classList.add('hidden');
+        cargarUsuarios();
+      } else {
+        alert(d.message);
+      }
+    }
+
+    async function cambiarPassword(user) {
+      const nueva = prompt(`Nueva contraseña para ${user}:`);
+      if (!nueva) return;
+      await fetch(`/api/usuarios/${user}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: nueva })
+      });
+      alert('Contraseña actualizada');
+    }
+
+    async function alternarEstado(user, estadoActual) {
+      const nuevo = estadoActual === 'Activo' ? 'Inactivo' : 'Activo';
+      await fetch(`/api/usuarios/${user}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: nuevo })
+      });
+      cargarUsuarios();
+    }
+
+    cargarUsuarios();
+  </script>
+</body>
+</html>
