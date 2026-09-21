@@ -4,24 +4,31 @@ from functools import wraps
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import gspread
 from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
-# Llave secreta para manejar sesiones seguras
 app.secret_key = os.getenv("SECRET_KEY", "quickland_secret_key_2026_crm")
 
 SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
-CREDENTIALS_FILE = os.getenv("CREDENTIALS_FILE", "credentials.json")
+# Render guarda los Secret Files en /etc/secrets/
+DEFAULT_CRED_PATH = "/etc/secrets/credentials.json" if os.path.exists("/etc/secrets/credentials.json") else "credentials.json"
+CREDENTIALS_FILE = os.getenv("CREDENTIALS_FILE", DEFAULT_CRED_PATH)
+DRIVE_FOLDER_ID = os.getenv("DRIVE_FOLDER_ID", "") # Carpeta de Drive donde se guardarán las fotos/audios
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
 
+def get_credentials():
+    return Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
+
 def get_spreadsheet():
-    creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
+    creds = get_credentials()
     client = gspread.authorize(creds)
     return client.open_by_key(SPREADSHEET_ID)
 
@@ -36,7 +43,30 @@ def get_usuarios_sheet():
     sh = get_spreadsheet()
     return sh.worksheet("Usuarios")
 
-# Decorador para proteger rutas con Login
+# Lógica centralizada para subir archivos a Google Drive
+def upload_file_to_drive(file_obj, filename, folder_id):
+    try:
+        creds = get_credentials()
+        drive_service = build('drive', 'v3', credentials=creds)
+        file_metadata = {'name': filename, 'parents': [folder_id]}
+        
+        # Leemos el archivo en memoria y lo subimos
+        media = MediaIoBaseUpload(file_obj.stream, mimetype=file_obj.mimetype, resumable=True)
+        uploaded_file = drive_service.files().create(
+            body=file_metadata, media_body=media, fields='id, webViewLink'
+        ).execute()
+        
+        # Otorga permisos de lectura pública (cualquiera con el link puede verlo)
+        drive_service.permissions().create(
+            fileId=uploaded_file.get('id'),
+            body={'type': 'anyone', 'role': 'reader'}
+        ).execute()
+        
+        return uploaded_file.get('webViewLink')
+    except Exception as e:
+        print(f"Error subiendo a Drive: {e}")
+        return None
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -45,7 +75,6 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# Decorador para restringir roles
 def role_required(roles_permitidos):
     def decorator(f):
         @wraps(f)
@@ -59,24 +88,19 @@ def role_required(roles_permitidos):
         return decorated_function
     return decorator
 
-# ================= RUTAS DE AUTENTICACIÓN =================
+# ================= RUTAS DE AUTENTICACIÓN Y VISTAS =================
 
 @app.route("/login", methods=["GET", "POST"])
 def login_view():
     if request.method == "GET":
         if "usuario" in session:
             rol = session.get("rol", "").upper()
-            if rol == "VENTAS":
-                return redirect(url_for("campo_view"))
-            elif rol == "BACKOFFICE":
-                return redirect(url_for("backoffice_view"))
-            elif rol == "POSTVENTA":
-                return redirect(url_for("postventa_view"))
-            elif rol == "ADMIN":
-                return redirect(url_for("admin_view"))
+            if rol == "VENTAS": return redirect(url_for("campo_view"))
+            elif rol == "BACKOFFICE": return redirect(url_for("backoffice_view"))
+            elif rol == "POSTVENTA": return redirect(url_for("postventa_view"))
+            elif rol == "ADMIN": return redirect(url_for("admin_view"))
         return render_template("login.html")
 
-    # POST Login
     datos = request.json or {}
     user_input = datos.get("usuario", "").strip()
     pass_input = datos.get("password", "").strip()
@@ -98,7 +122,6 @@ def login_view():
             session["usuario"] = usuario_encontrado.get("USUARIO")
             session["nombre"] = usuario_encontrado.get("NOMBRE_COMPLETO")
             session["rol"] = usuario_encontrado.get("ROL")
-            
             rol = session["rol"].upper()
             redirect_url = "/campo" if rol == "VENTAS" else f"/{rol.lower()}"
             return jsonify({"status": "success", "redirect": redirect_url, "rol": rol})
@@ -112,23 +135,14 @@ def logout():
     session.clear()
     return redirect(url_for("login_view"))
 
-# ================= RUTAS DE VISTAS =================
-
 @app.route("/")
 def index():
-    # Si el usuario ya está logueado, lo mandamos a su panel del CRM
     if "usuario" in session:
         rol = session.get("rol", "").upper()
-        if rol == "VENTAS":
-            return redirect(url_for("campo_view"))
-        elif rol == "BACKOFFICE":
-            return redirect(url_for("backoffice_view"))
-        elif rol == "POSTVENTA":
-            return redirect(url_for("postventa_view"))
-        elif rol == "ADMIN":
-            return redirect(url_for("admin_view"))
-    
-    # Si no está logueado, ve la página web comercial (Landing Page)
+        if rol == "VENTAS": return redirect(url_for("campo_view"))
+        elif rol == "BACKOFFICE": return redirect(url_for("backoffice_view"))
+        elif rol == "POSTVENTA": return redirect(url_for("postventa_view"))
+        elif rol == "ADMIN": return redirect(url_for("admin_view"))
     return render_template("landing.html")
 
 @app.route("/campo")
@@ -166,7 +180,6 @@ def api_obtener_ventas():
         rol = session.get("rol", "").upper()
         usuario = session.get("usuario", "").strip().upper()
 
-        # Si el usuario es de VENTAS, filtrar SOLO sus propias ventas
         if rol == "VENTAS":
             ventas_filtradas = [
                 v for v in registros
@@ -184,9 +197,9 @@ def api_obtener_ventas():
 @role_required(["VENTAS", "ADMIN"])
 def api_registrar_venta():
     try:
-        # Aquí eventualmente ajustarás para recibir FormData cuando conectes Google Drive
-        datos = request.json or {}
-        sheet = get_ventas_sheet()
+        # AHORA RECIBE FORMDATA Y ARCHIVOS
+        datos = request.form
+        archivos = request.files.getlist("documentos_venta")
 
         ahora = datetime.now()
         id_venta = f"V-{ahora.strftime('%y%m%d%H%M%S')}"
@@ -196,7 +209,19 @@ def api_registrar_venta():
         precio_plan = float(datos.get("precio_plan") or 0)
         monto_comision = float(datos.get("monto_comision") or precio_plan)
 
-        # Fila con las 24 columnas
+        # Lógica de subida de múltiples archivos a Drive
+        enlaces_drive = []
+        if DRIVE_FOLDER_ID and archivos:
+            for idx, archivo in enumerate(archivos):
+                if archivo.filename:
+                    ext = archivo.filename.split('.')[-1]
+                    nuevo_nombre = f"{id_venta}_Doc_{idx+1}.{ext}"
+                    link = upload_file_to_drive(archivo, nuevo_nombre, DRIVE_FOLDER_ID)
+                    if link: enlaces_drive.append(link)
+        
+        # Combinamos los links con un salto de línea
+        evidencia_str = "\n".join(enlaces_drive) if enlaces_drive else "N/A"
+
         nueva_fila = [
             id_venta,                                   
             fecha_registro,                             
@@ -206,7 +231,7 @@ def api_registrar_venta():
             datos.get("cliente_telefono", "").strip(),  
             datos.get("direccion", "").strip(),         
             datos.get("plan_producto", "").strip(),     
-            datos.get("evidencia_drive", "").strip() or "N/A", 
+            evidencia_str, # Columna de Evidencia con los links
             "PENDIENTE BO",                             
             "Pendiente",                                
             "",                                         
@@ -224,6 +249,7 @@ def api_registrar_venta():
             "Pendiente"                                 
         ]
 
+        sheet = get_ventas_sheet()
         sheet.append_row(nueva_fila)
         return jsonify({"status": "success", "id_venta": id_venta})
     except Exception as e:
@@ -233,9 +259,7 @@ def api_registrar_venta():
 @login_required
 def api_actualizar_venta(id_venta):
     try:
-        datos = request.json or {}
         sheet = get_ventas_sheet()
-
         celda = sheet.find(id_venta)
         if not celda:
             return jsonify({"status": "error", "message": "Venta no encontrada"}), 404
@@ -243,6 +267,14 @@ def api_actualizar_venta(id_venta):
         fila_num = celda.row
         ahora = datetime.now().strftime("%Y-%m-%d %H:%M")
         rol = session.get("rol", "").upper()
+
+        # Determinar si recibimos FormData (Audio) o JSON tradicional
+        if request.content_type and "multipart/form-data" in request.content_type:
+            datos = request.form.to_dict()
+            audio_file = request.files.get("audio_contrato")
+        else:
+            datos = request.json or {}
+            audio_file = None
 
         if rol in ["BACKOFFICE", "ADMIN"]:
             if "estado_bo" in datos:
@@ -264,38 +296,33 @@ def api_actualizar_venta(id_venta):
             if "observaciones" in datos:
                 sheet.update_cell(fila_num, 16, datos["observaciones"])
 
+            # Guardar el audio en Drive y anexarlo a la columna EVIDENCIA_DRIVE (Columna 9)
+            if audio_file and DRIVE_FOLDER_ID:
+                nuevo_nombre = f"{id_venta}_Audio_Contrato.webm"
+                link_audio = upload_file_to_drive(audio_file, nuevo_nombre, DRIVE_FOLDER_ID)
+                if link_audio:
+                    evidencia_actual = sheet.cell(fila_num, 9).value or ""
+                    nueva_evidencia = f"{evidencia_actual}\nAUDIO: {link_audio}" if evidencia_actual and evidencia_actual != "N/A" else f"AUDIO: {link_audio}"
+                    sheet.update_cell(fila_num, 9, nueva_evidencia)
+
         if rol in ["POSTVENTA", "ADMIN"]:
-            if "numero_recibo" in datos:
-                sheet.update_cell(fila_num, 22, datos["numero_recibo"])
+            if "numero_recibo" in datos: sheet.update_cell(fila_num, 22, datos["numero_recibo"])
+            if "fecha_vencimiento_recibo" in datos: sheet.update_cell(fila_num, 23, datos["fecha_vencimiento_recibo"])
+            if "estado_pago_cliente" in datos: sheet.update_cell(fila_num, 24, datos["estado_pago_cliente"])
+            if "estado_comision" in datos: sheet.update_cell(fila_num, 20, datos["estado_comision"])
+            if "fecha_pago_comision" in datos: sheet.update_cell(fila_num, 21, datos["fecha_pago_comision"])
 
-            if "fecha_vencimiento_recibo" in datos:
-                sheet.update_cell(fila_num, 23, datos["fecha_vencimiento_recibo"])
-
-            if "estado_pago_cliente" in datos:
-                sheet.update_cell(fila_num, 24, datos["estado_pago_cliente"])
-
-            if "estado_comision" in datos:
-                sheet.update_cell(fila_num, 20, datos["estado_comision"])
-
-            if "fecha_pago_comision" in datos:
-                sheet.update_cell(fila_num, 21, datos["fecha_pago_comision"])
-
+        # Recalcular ESTADO_GENERAL
         est_inst = sheet.cell(fila_num, 15).value
         est_sub = sheet.cell(fila_num, 13).value
         est_bo = sheet.cell(fila_num, 11).value
 
-        if est_inst == "Instalado":
-            estado_general = "INSTALADO"
-        elif est_inst == "Frustrado":
-            estado_general = "INST. FRUSTRADA"
-        elif est_sub == "Subido":
-            estado_general = "SUBIDO / EN RUTA"
-        elif est_bo == "Contactado":
-            estado_general = "VALIDADO BO"
-        elif est_bo == "Rechazado":
-            estado_general = "RECHAZADO BO"
-        else:
-            estado_general = "PENDIENTE BO"
+        if est_inst == "Instalado": estado_general = "INSTALADO"
+        elif est_inst == "Frustrado": estado_general = "INST. FRUSTRADA"
+        elif est_sub == "Subido": estado_general = "SUBIDO / EN RUTA"
+        elif est_bo == "Contactado": estado_general = "VALIDADO BO"
+        elif est_bo == "Rechazado": estado_general = "RECHAZADO BO"
+        else: estado_general = "PENDIENTE BO"
 
         sheet.update_cell(fila_num, 10, estado_general)
         sheet.update_cell(fila_num, 17, ahora)
@@ -313,8 +340,7 @@ def api_obtener_usuarios():
     try:
         u_sheet = get_usuarios_sheet()
         usuarios = u_sheet.get_all_records()
-        for u in usuarios:
-            u["PASSWORD"] = "••••••"
+        for u in usuarios: u["PASSWORD"] = "••••••"
         return jsonify({"status": "success", "data": usuarios})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -359,12 +385,9 @@ def api_modificar_usuario(usuario):
             return jsonify({"status": "error", "message": "Usuario no encontrado"}), 404
 
         fila = celda.row
-        if "password" in datos and datos["password"].strip():
-            u_sheet.update_cell(fila, 4, datos["password"].strip())
-        if "rol" in datos:
-            u_sheet.update_cell(fila, 5, datos["rol"].strip().upper())
-        if "estado" in datos:
-            u_sheet.update_cell(fila, 6, datos["estado"].strip())
+        if "password" in datos and datos["password"].strip(): u_sheet.update_cell(fila, 4, datos["password"].strip())
+        if "rol" in datos: u_sheet.update_cell(fila, 5, datos["rol"].strip().upper())
+        if "estado" in datos: u_sheet.update_cell(fila, 6, datos["estado"].strip())
 
         return jsonify({"status": "success"})
     except Exception as e:
