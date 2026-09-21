@@ -112,21 +112,24 @@ def logout():
     session.clear()
     return redirect(url_for("login_view"))
 
-# ================= RUTAS DE VISTAS POR ROL =================
+# ================= RUTAS DE VISTAS =================
 
 @app.route("/")
-@login_required
 def index():
-    rol = session.get("rol", "").upper()
-    if rol == "VENTAS":
-        return redirect(url_for("campo_view"))
-    elif rol == "BACKOFFICE":
-        return redirect(url_for("backoffice_view"))
-    elif rol == "POSTVENTA":
-        return redirect(url_for("postventa_view"))
-    elif rol == "ADMIN":
-        return redirect(url_for("admin_view"))
-    return redirect(url_for("login_view"))
+    # Si el usuario ya está logueado, lo mandamos a su panel del CRM
+    if "usuario" in session:
+        rol = session.get("rol", "").upper()
+        if rol == "VENTAS":
+            return redirect(url_for("campo_view"))
+        elif rol == "BACKOFFICE":
+            return redirect(url_for("backoffice_view"))
+        elif rol == "POSTVENTA":
+            return redirect(url_for("postventa_view"))
+        elif rol == "ADMIN":
+            return redirect(url_for("admin_view"))
+    
+    # Si no está logueado, ve la página web comercial (Landing Page)
+    return render_template("landing.html")
 
 @app.route("/campo")
 @login_required
@@ -181,6 +184,7 @@ def api_obtener_ventas():
 @role_required(["VENTAS", "ADMIN"])
 def api_registrar_venta():
     try:
+        # Aquí eventualmente ajustarás para recibir FormData cuando conectes Google Drive
         datos = request.json or {}
         sheet = get_ventas_sheet()
 
@@ -190,35 +194,34 @@ def api_registrar_venta():
 
         asesor = session.get("usuario", "").strip().upper()
         precio_plan = float(datos.get("precio_plan") or 0)
-        # Comisión estimada por defecto: 100% del plan o valor enviado
         monto_comision = float(datos.get("monto_comision") or precio_plan)
 
         # Fila con las 24 columnas
         nueva_fila = [
-            id_venta,                                   # A: ID_VENTA
-            fecha_registro,                             # B: FECHA_REGISTRO
-            asesor,                                     # C: ASESOR_CAMPO
-            datos.get("cliente_nombre", "").strip().title(), # D: CLIENTE_NOMBRE
-            datos.get("cliente_dni", "").strip(),       # E: CLIENTE_DNI
-            datos.get("cliente_telefono", "").strip(),  # F: CLIENTE_TELEFONO
-            datos.get("direccion", "").strip(),         # G: DIRECCION
-            datos.get("plan_producto", "").strip(),     # H: PLAN_PRODUCTO
-            datos.get("evidencia_drive", "").strip() or "N/A", # I: EVIDENCIA_DRIVE
-            "PENDIENTE BO",                             # J: ESTADO_GENERAL
-            "Pendiente",                                # K: ESTADO_BO
-            "",                                         # L: FECHA_CONTACTO_BO
-            "Pendiente",                                # M: ESTADO_SUBIDA
-            "",                                         # N: FECHA_INSTALACION
-            "Pendiente",                                # O: ESTADO_INSTALACION
-            datos.get("observaciones", "").strip(),     # P: OBSERVACIONES
-            fecha_registro,                             # Q: ULTIMA_ACTUALIZACION
-            precio_plan,                                # R: PRECIO_PLAN
-            monto_comision,                             # S: MONTO_COMISION
-            "Pendiente instalación",                    # T: ESTADO_COMISION
-            "",                                         # U: FECHA_PAGO_COMISION
-            "",                                         # V: NUMERO_RECIBO_CLIENTE
-            "",                                         # W: FECHA_VENCIMIENTO_RECIBO
-            "Pendiente"                                 # X: ESTADO_PAGO_CLIENTE
+            id_venta,                                   
+            fecha_registro,                             
+            asesor,                                     
+            datos.get("cliente_nombre", "").strip().title(), 
+            datos.get("cliente_dni", "").strip(),       
+            datos.get("cliente_telefono", "").strip(),  
+            datos.get("direccion", "").strip(),         
+            datos.get("plan_producto", "").strip(),     
+            datos.get("evidencia_drive", "").strip() or "N/A", 
+            "PENDIENTE BO",                             
+            "Pendiente",                                
+            "",                                         
+            "Pendiente",                                
+            "",                                         
+            "Pendiente",                                
+            datos.get("observaciones", "").strip(),     
+            fecha_registro,                             
+            precio_plan,                                
+            monto_comision,                             
+            "Pendiente instalación",                    
+            "",                                         
+            "",                                         
+            "",                                         
+            "Pendiente"                                 
         ]
 
         sheet.append_row(nueva_fila)
@@ -241,7 +244,6 @@ def api_actualizar_venta(id_venta):
         ahora = datetime.now().strftime("%Y-%m-%d %H:%M")
         rol = session.get("rol", "").upper()
 
-        # Actualizaciones permitidas para BACK OFFICE y ADMIN
         if rol in ["BACKOFFICE", "ADMIN"]:
             if "estado_bo" in datos:
                 sheet.update_cell(fila_num, 11, datos["estado_bo"])
@@ -256,14 +258,12 @@ def api_actualizar_venta(id_venta):
 
             if "estado_instalacion" in datos:
                 sheet.update_cell(fila_num, 15, datos["estado_instalacion"])
-                # LÓGICA DE NEGOCIO: Si ya está instalado, cuenta como exitosa y pasa comisión a 'Por liquidar'
                 if datos["estado_instalacion"] == "Instalado":
                     sheet.update_cell(fila_num, 20, "Por liquidar")
 
             if "observaciones" in datos:
                 sheet.update_cell(fila_num, 16, datos["observaciones"])
 
-        # Actualizaciones permitidas para POST-VENTA y ADMIN
         if rol in ["POSTVENTA", "ADMIN"]:
             if "numero_recibo" in datos:
                 sheet.update_cell(fila_num, 22, datos["numero_recibo"])
@@ -274,14 +274,12 @@ def api_actualizar_venta(id_venta):
             if "estado_pago_cliente" in datos:
                 sheet.update_cell(fila_num, 24, datos["estado_pago_cliente"])
 
-            # LÓGICA DE COMISIÓN DE POST-VENTA
             if "estado_comision" in datos:
                 sheet.update_cell(fila_num, 20, datos["estado_comision"])
 
             if "fecha_pago_comision" in datos:
                 sheet.update_cell(fila_num, 21, datos["fecha_pago_comision"])
 
-        # Recalcular ESTADO_GENERAL
         est_inst = sheet.cell(fila_num, 15).value
         est_sub = sheet.cell(fila_num, 13).value
         est_bo = sheet.cell(fila_num, 11).value
@@ -306,7 +304,7 @@ def api_actualizar_venta(id_venta):
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-# ================= API ENDPOINTS: USUARIOS (ADMIN) =================
+# ================= API ENDPOINTS: USUARIOS =================
 
 @app.route("/api/usuarios", methods=["GET"])
 @login_required
@@ -315,7 +313,6 @@ def api_obtener_usuarios():
     try:
         u_sheet = get_usuarios_sheet()
         usuarios = u_sheet.get_all_records()
-        # Ocultar contraseñas en la respuesta
         for u in usuarios:
             u["PASSWORD"] = "••••••"
         return jsonify({"status": "success", "data": usuarios})
@@ -362,7 +359,6 @@ def api_modificar_usuario(usuario):
             return jsonify({"status": "error", "message": "Usuario no encontrado"}), 404
 
         fila = celda.row
-        # Columnas: ID(1), NOMBRE(2), USUARIO(3), PASSWORD(4), ROL(5), ESTADO(6)
         if "password" in datos and datos["password"].strip():
             u_sheet.update_cell(fila, 4, datos["password"].strip())
         if "rol" in datos:
