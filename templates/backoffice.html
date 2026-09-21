@@ -124,8 +124,8 @@
   </main>
 
   <!-- MODAL PARA GESTIONAR VENTA -->
-  <div id="modalGestion" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+  <div id="modalGestion" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4 my-8">
       <div class="flex justify-between items-center border-b pb-3">
         <h3 class="font-bold text-base text-slate-800" id="modalTitulo">Gestionar Venta</h3>
         <button onclick="cerrarModal()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
@@ -137,6 +137,31 @@
           <p><strong class="text-slate-600">DNI:</strong> <span id="mDni"></span> | <strong class="text-slate-600">Teléfono:</strong> <span id="mTel"></span></p>
           <p><strong class="text-slate-600">Dirección:</strong> <span id="mDir"></span></p>
           <p><strong class="text-slate-600">Plan:</strong> <span id="mPlan"></span></p>
+        </div>
+
+        <!-- Sección de Documentos Subidos -->
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 mb-3">
+          <label class="block font-semibold text-slate-600 mb-2">Documentos del Cliente</label>
+          <div id="mDocumentosLinks" class="flex gap-2 flex-wrap">
+            <!-- Botones estáticos de muestra, aquí conectarás los reales de Drive -->
+            <a href="#" class="bg-white border border-slate-200 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-50 transition"><i class="fa-solid fa-image mr-1"></i> DNI Frontal</a>
+            <a href="#" class="bg-white border border-slate-200 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-50 transition"><i class="fa-solid fa-image mr-1"></i> DNI Reverso</a>
+            <a href="#" class="bg-white border border-slate-200 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-50 transition"><i class="fa-solid fa-file-pdf mr-1"></i> Recibo Luz</a>
+          </div>
+        </div>
+
+        <!-- Grabadora de Contrato de Voz -->
+        <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100 mb-3">
+          <label class="block font-semibold text-indigo-900 mb-2">Grabación de Contrato (Voz)</label>
+          <div class="flex items-center gap-3">
+            <button type="button" id="btnGrabar" onclick="iniciarGrabacion()" class="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 rounded-lg text-xs font-bold transition flex items-center">
+              <i class="fa-solid fa-microphone mr-1.5"></i> Iniciar Grabación
+            </button>
+            <button type="button" id="btnDetener" onclick="detenerGrabacion()" class="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold transition hidden flex items-center">
+              <i class="fa-solid fa-stop mr-1.5"></i> Detener
+            </button>
+            <audio id="audioContrato" controls class="h-8 w-full hidden"></audio>
+          </div>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
@@ -192,7 +217,47 @@
   <script>
     let ventasGlobal = [];
     let ventaSeleccionada = null;
+    let mediaRecorder;
+    let audioChunks = [];
 
+    // --- Lógica de Grabación de Audio ---
+    async function iniciarGrabacion() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+            
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                const reproductor = document.getElementById('audioContrato');
+                reproductor.src = audioUrl;
+                reproductor.classList.remove('hidden');
+            };
+            
+            audioChunks = [];
+            mediaRecorder.start();
+            
+            document.getElementById('btnGrabar').classList.add('hidden');
+            document.getElementById('btnDetener').classList.remove('hidden');
+        } catch (err) {
+            alert("Debes permitir el acceso al micrófono para grabar el contrato.");
+        }
+    }
+
+    function detenerGrabacion() {
+        if(mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+            document.getElementById('btnGrabar').classList.remove('hidden');
+            document.getElementById('btnDetener').classList.add('hidden');
+        }
+    }
+
+    // --- Lógica de Gestión de Ventas ---
     async function cargarVentas() {
       const tbody = document.getElementById('tablaCuerpo');
       tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-slate-400"><i class="fa-solid fa-spinner fa-spin text-xl mr-2"></i>Cargando datos desde Sheets...</td></tr>';
@@ -290,12 +355,21 @@
       document.getElementById('mFechaInstalacion').value = venta.FECHA_INSTALACION || '';
       document.getElementById('mObservaciones').value = venta.OBSERVACIONES || '';
 
+      // Reset audio y botones
+      document.getElementById('audioContrato').classList.add('hidden');
+      document.getElementById('audioContrato').src = '';
+      document.getElementById('btnGrabar').classList.remove('hidden');
+      document.getElementById('btnDetener').classList.add('hidden');
+
       document.getElementById('modalGestion').classList.remove('hidden');
     }
 
     function cerrarModal() {
       document.getElementById('modalGestion').classList.add('hidden');
       ventaSeleccionada = null;
+      if(mediaRecorder && mediaRecorder.state === "recording") {
+          mediaRecorder.stop();
+      }
     }
 
     async function guardarCambiosModal() {
